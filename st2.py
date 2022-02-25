@@ -1,4 +1,4 @@
-from turtle import onclick
+
 import streamlit as st
 import time 
 from chess_class import chess_class
