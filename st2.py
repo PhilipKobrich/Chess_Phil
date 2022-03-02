@@ -40,7 +40,7 @@ for col in range(8):
                          if end_positions[i]==pos:
                               break
                     action=actions[i]
-                    chess._take_move(action)
+                    chess._take_move(st.session_state["player"],action)
                     st.session_state["board"]=copy.deepcopy(chess.board)
                     if player=="white":
                          st.session_state["player"]="black"

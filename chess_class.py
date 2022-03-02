@@ -1,4 +1,6 @@
 import copy
+import weakref
+import numpy as np
 class chess_class():
     def __init__(self):
         self.empty="   " # Definition of the empty square
@@ -55,6 +57,7 @@ class chess_class():
                         moves.append(move_dict)
         return moves
     def setup_board(self):
+        self.all_moves_legal=True
         self.board=[]
         for i in range(8):
             self.board.append([self.empty]*8)
@@ -102,15 +105,113 @@ class chess_class():
                 if piece not in pieces:
                     pieces.append(piece)
         self.pieces=pieces
-
-    def _observe_board(self):
+    def _get_alivie_pieces(self):
+        pieces=[]
+        for i in range(8):
+            for j in range(8):
+                piece=self.board[i][j]
+                if piece not in pieces:
+                    pieces.append(piece)
+        return pieces
+    def _observe_board2(self,player):
         obs=[]
         for i in range(8):
             for j in range(8):
                 obs+=[1 if piece=="   " else 0 for piece in self.pieces]
-
+        if player=="white":
+            player_i=0
+        else:
+            player_i=1
+        obs+=[player_i]
         return obs
-    
+    def _observe_board(self,player):
+        obs=[]
+        b_p=np.zeros([8,8])
+        b_r=np.zeros([8,8])
+        b_k=np.zeros([8,8])
+        b_b=np.zeros([8,8])
+        b_Q=np.zeros([8,8])
+        b_K=np.zeros([8,8])
+        w_p=np.zeros([8,8])
+        w_r=np.zeros([8,8])
+        w_k=np.zeros([8,8])
+        w_b=np.zeros([8,8])
+        w_Q=np.zeros([8,8])
+        w_K=np.zeros([8,8])
+        for row in range(8):
+            for col in range(8):
+                piece=self.board[row][col]
+                if piece=="b_p": b_p[row,col]=1
+                if piece=="b_r": b_r[row,col]=1
+                if piece=="b_b": b_b[row,col]=1
+                if piece=="b_k": b_k[row,col]=1
+                if piece=="b_Q": b_Q[row,col]=1
+                if piece=="b_K": b_K[row,col]=1
+
+                if piece=="w_p": w_p[row,col]=1
+                if piece=="w_r": w_r[row,col]=1
+                if piece=="w_b": w_b[row,col]=1
+                if piece=="w_k": w_k[row,col]=1
+                if piece=="w_Q": w_Q[row,col]=1
+                if piece=="w_K": w_K[row,col]=1
+                
+        obs.append(b_p)
+        obs.append(b_r)
+        obs.append(b_k)
+        obs.append(b_b)
+        obs.append(b_Q)
+        obs.append(b_K)
+
+        obs.append(w_p)
+        obs.append(w_r)
+        obs.append(w_k)
+        obs.append(w_b)
+        obs.append(w_Q)
+        obs.append(w_K)
+        obs=np.array(obs)
+        return obs
+    def _get_board_fromb_obs(self,observation):
+        obs=list(observation[:12])
+        b_p=obs[0]
+        b_r=obs[1]
+        b_k=obs[2]
+        b_b=obs[3]
+        b_Q=obs[4]
+        b_K=obs[5]
+        
+        w_p=obs[6]
+        w_r=obs[7]
+        w_k=obs[8]
+        w_b=obs[9]
+        w_Q=obs[10]
+        w_K=obs[11]
+        pieces=["b_p",
+        "b_r",
+        "b_k",
+        "b_b",
+        "b_Q",
+        "b_K",
+        "w_p",
+        "w_r",
+        "w_k",
+        "w_b",
+        "w_Q",
+        "w_K",
+        ]
+        new_board=[]
+        for row in range(8):
+            new_board.append([self.empty]*8)
+
+        for layer in range(12):
+            piece=pieces[layer]
+            for row in range(8):
+                for col in range(8):
+                    selection=obs[layer][row][col]
+                    if selection==1:
+                        new_board[row][col]=piece
+        return new_board
+
+
     def _is_legal_movement(self,player,action,board):
         # player str: "white" or "black"
         # action int: between 0 and 4671, identifiying the move to take
@@ -252,6 +353,18 @@ class chess_class():
         else:
             # if the move does not satisfy the pieces resrictions, it is illegal
             return False
+    def _update_legal_moves(self):
+        self.move_legality_black=[]
+        self.move_legality_white=[]
+        for action in range(len(self.moves)):
+            move=self.moves[action]
+            legal_white,_=self._is_legal_movement("white",action,self.board)
+            legal_black,_=self._is_legal_movement("black",action,self.board)
+
+
+            
+
+            1
     def _bool_is_check_mate_draw(self,player):
 
         king_found=False
@@ -336,11 +449,6 @@ class chess_class():
         is_check=self._bool_check_threat(player,king_position,board)
         # if is_check: print(player[0]+"_K")
         return is_check
-    
-    # def _bool_check_mate(self,player):
-    #     if self._bool_check(player):
-    #         1 asuhd asfadsfí asfasdf as[ 12 3]
-            
 
     def _bool_check_threat(self,player,position,board):
         if player=="white":
@@ -356,7 +464,19 @@ class chess_class():
             if move["end_position"]==position and threat and legal:
                 return True
         return False
-    def _take_move(self,action):
+    def promote_pawns(self):
+        for i in range(8):
+            piece_up=self.board[0][i]
+            piece_down=self.board[7][i]
+            if piece_up=="w_p":
+                self.board[0][i]="w_Q"
+            if piece_down=="b_p":
+                self.board[0][i]="b_Q"
+    def _take_move(self,player,action):
+        if not self._is_legal(player,action,self.board):
+            self.all_moves_legal=False
+            return
+        # This function does the move
         move=self.moves[action]
         s_pos=move["start_position"]
         piece=self.board[s_pos[0]][s_pos[1]]
@@ -366,6 +486,8 @@ class chess_class():
             e_pos=move["end_position"]
             self.board[e_pos[0]][e_pos[1]]=piece
             self.board[s_pos[0]][s_pos[1]]=self.empty
+            self.promote_pawns() #Checks if a pawn needs to be promoted and promotes it 
+
     def _test_take_move(self,action):
         move=self.moves[action]
         new_board=copy.deepcopy(self.board)
@@ -379,10 +501,23 @@ class chess_class():
             new_board[s_pos[0]][s_pos[1]]=self.empty
         return new_board
     def _check_game_end(self,player):
+        # Checks if the game has ended before the player has moved
         done=False
         game_status=player+" moves"
         check_mate,draw=self._bool_is_check_mate_draw(player)
-        if check_mate:
+        pieces=self._get_alivie_pieces()
+        if self.all_moves_legal==False:
+            done=True
+            draw=False
+            if player=="white":
+                game_status="Black player made an illegal move"
+            elif player=="black":
+                game_status="White player made an illegal move"
+        elif len(pieces)<=2:
+            done=True
+            draw=True
+            game_status="Game ends in a draw"
+        elif check_mate:
             done=True
             draw=False
             if player=="white":
@@ -404,7 +539,35 @@ class chess_class():
                     actions.append(action)
                     end_pos.append(move["end_position"])
         return actions,end_pos
-        
+    def choose_random_move(self,player):
+        legal_actions=[]
+        for i in range(len(self.moves)):
+            legal=self._is_legal(player,i,self.board)
+            if legal:
+                legal_actions.append(i)
+        action=np.random.choice(legal_actions)
+        return action
+    def choose_random_move_from_obs(self,observation,player):
+        new_board=self._get_board_fromb_obs(observation)
+        legal_actions=[]
+        for i in range(len(self.moves)):
+            legal=self._is_legal(player,i,self.board)
+            if legal:
+                legal_actions.append(i)
+        action=np.random.choice(legal_actions)
+        return action
+    def _action_from_Q_values(self,observation,player,Q_values):
+        # Get a legal action from the Q_values
+        new_board=self._get_board_fromb_obs(observation)
+        legal_actions_Q=[]
+        actions=[]
+        for action in range(len(Q_values)):
+            legal=self._is_legal(player,action,new_board)
+            if legal:
+                actions.append(action)
+                legal_actions_Q.append(Q_values[action])
+        return actions[np.argmax(np.array(legal_actions_Q))]
+
     
 
     
@@ -425,9 +588,3 @@ class chess_class():
 
 
                 
-
-
-
-
-chess=chess_class()
-
